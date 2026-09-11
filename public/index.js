@@ -34,6 +34,23 @@ scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 
+// Initialize libcurl WASM globally before using it
+let libcurlLoaded = false;
+
+async function initializeLibcurl() {
+	if (libcurlLoaded) return;
+	try {
+		const libcurlModule = await import("/libcurl/index.mjs");
+		if (libcurlModule.default && typeof libcurlModule.default.load_wasm === "function") {
+			await libcurlModule.default.load_wasm();
+			libcurlLoaded = true;
+		}
+	} catch (err) {
+		console.warn("Failed to pre-load libcurl WASM:", err);
+		// Continue anyway, the worker will try to load it
+	}
+}
+
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
 
@@ -43,6 +60,13 @@ form.addEventListener("submit", async (event) => {
 		error.textContent = "Failed to register service worker.";
 		errorCode.textContent = err.toString();
 		throw err;
+	}
+
+	// Ensure libcurl is loaded before setting transport
+	try {
+		await initializeLibcurl();
+	} catch (err) {
+		console.warn("Error during libcurl initialization:", err);
 	}
 
 	const url = search(address.value, searchEngine.value);
@@ -62,3 +86,4 @@ form.addEventListener("submit", async (event) => {
 	document.body.appendChild(frame.frame);
 	frame.go(url);
 });
+
