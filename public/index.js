@@ -1,27 +1,10 @@
 "use strict";
-/**
- * @type {HTMLFormElement}
- */
 const form = document.getElementById("sj-form");
-/**
- * @type {HTMLInputElement}
- */
 const address = document.getElementById("sj-address");
-/**
- * @type {HTMLInputElement}
- */
 const searchEngine = document.getElementById("sj-search-engine");
-/**
- * @type {HTMLParagraphElement}
- */
 const error = document.getElementById("sj-error");
-/**
- * @type {HTMLPreElement}
- */
 const errorCode = document.getElementById("sj-error-code");
-
 const { ScramjetController } = $scramjetLoadController();
-
 const scramjet = new ScramjetController({
 	files: {
 		wasm: "/scram/scramjet.wasm.wasm",
@@ -29,68 +12,9 @@ const scramjet = new ScramjetController({
 		sync: "/scram/scramjet.sync.js",
 	},
 });
-
 scramjet.init();
-
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-
-// Initialize libcurl WASM globally before using it
-let libcurlLoaded = false;
-
-async function initializeLibcurl() {
-	if (libcurlLoaded) return;
-	try {
-		const libcurlModule = await import("/libcurl/index.mjs");
-		if (libcurlModule.default && typeof libcurlModule.default.load_wasm === "function") {
-			await libcurlModule.default.load_wasm();
-			libcurlLoaded = true;
-		}
-	} catch (err) {
-		console.warn("Failed to pre-load libcurl WASM:", err);
-		// Continue anyway, the worker will try to load it
-	}
-}
-
-// Fonction pour détecter si c'est une URL directe
-function isDirectUrl(inputValue) {
-	const trimmed = inputValue.trim();
-	
-	// Si ça commence par http:// ou https://, c'est une URL directe
-	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-		return true;
-	}
-	
-	// Si c'est un domaine sans protocole (contient un point et pas d'espace), c'est une URL directe
-	if (trimmed.includes(".") && !trimmed.includes(" ")) {
-		return true;
-	}
-	
-	return false;
-}
-
-// Fonction pour formater une URL directe
-function formatDirectUrl(input) {
-	const trimmed = input.trim();
-	
-	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-		return trimmed;
-	}
-	
-	// Ajoute https:// si ce n'est pas présent
-	return "https://" + trimmed;
-}
-
-form.addEventListener("submit", async (event) => {
-	event.preventDefault();
-
-	const inputValue = address.value;
-	
-	// Vérifie si c'est une URL directe (TikTok.com, YouTube.com, etc)
-	if (isDirectUrl(inputValue)) {
-		window.location.href = formatDirectUrl(inputValue);
-		return;
-	}
-
+async function launch(url) {
 	try {
 		await registerSW();
 	} catch (err) {
@@ -98,16 +22,6 @@ form.addEventListener("submit", async (event) => {
 		errorCode.textContent = err.toString();
 		throw err;
 	}
-
-	// Ensure libcurl is loaded before setting transport
-	try {
-		await initializeLibcurl();
-	} catch (err) {
-		console.warn("Error during libcurl initialization:", err);
-	}
-
-	const url = search(inputValue, searchEngine.value);
-
 	let wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") +
 		"://" +
@@ -122,5 +36,13 @@ form.addEventListener("submit", async (event) => {
 	frame.frame.id = "sj-frame";
 	document.body.appendChild(frame.frame);
 	frame.go(url);
+}
+form.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	await launch(search(address.value, searchEngine ? searchEngine.value : null));
+});
+window.addEventListener("DOMContentLoaded", () => {
+	const target = new URLSearchParams(window.location.search).get("url");
+	if (target) launch(target);
 });
 
