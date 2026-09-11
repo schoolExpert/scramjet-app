@@ -51,8 +51,45 @@ async function initializeLibcurl() {
 	}
 }
 
+// Fonction pour détecter si c'est une URL directe
+function isDirectUrl(inputValue) {
+	const trimmed = inputValue.trim();
+	
+	// Si ça commence par http:// ou https://, c'est une URL directe
+	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+		return true;
+	}
+	
+	// Si c'est un domaine sans protocole (contient un point et pas d'espace), c'est une URL directe
+	if (trimmed.includes(".") && !trimmed.includes(" ")) {
+		return true;
+	}
+	
+	return false;
+}
+
+// Fonction pour formater une URL directe
+function formatDirectUrl(input) {
+	const trimmed = input.trim();
+	
+	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+		return trimmed;
+	}
+	
+	// Ajoute https:// si ce n'est pas présent
+	return "https://" + trimmed;
+}
+
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
+
+	const inputValue = address.value;
+	
+	// Vérifie si c'est une URL directe (TikTok.com, YouTube.com, etc)
+	if (isDirectUrl(inputValue)) {
+		window.location.href = formatDirectUrl(inputValue);
+		return;
+	}
 
 	try {
 		await registerSW();
@@ -69,7 +106,7 @@ form.addEventListener("submit", async (event) => {
 		console.warn("Error during libcurl initialization:", err);
 	}
 
-	const url = search(address.value, searchEngine.value);
+	const url = search(inputValue, searchEngine.value);
 
 	let wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") +
